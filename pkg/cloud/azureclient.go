@@ -7,13 +7,10 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
-	"net/http"
-	"regexp"
-	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azidentity "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/services/preview/authorization/mgmt/2018-01-01-preview/authorization"
-	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2016-06-01/subscriptions"
+	authorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
@@ -23,7 +20,6 @@ import (
 	msgraphbetasdk "github.com/microsoftgraph/msgraph-beta-sdk-go"
 	"github.com/microsoftgraph/msgraph-beta-sdk-go/models/microsoft/graph"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 // ref: https://docs.microsoft.com/en-us/graph/migrate-azure-ad-graph-request-differences#basic-requests
@@ -61,8 +57,8 @@ type AzureClient struct {
 
 	graphServiceClient *msgraphbetasdk.GraphServiceClient
 
-	roleAssignmentsClient authorization.RoleAssignmentsClient
-	roleDefinitionsClient authorization.RoleDefinitionsClient
+	roleAssignmentsClient *authorization.RoleAssignmentsClient
+	roleDefinitionsClient *authorization.RoleDefinitionsClient
 }
 
 // NewAzureClientWithCLI creates an AzureClient configured from Azure CLI 2.0 for local development scenarios.
@@ -198,10 +194,21 @@ func newAzureClientWithCertificate(env azure.Environment, oauthConfig *adal.OAut
 	return getClient(env, subscriptionID, tenantID, autorest.NewBearerAuthorizer(armSpt), auth)
 }
 
-func getClient(env azure.Environment, subscriptionID, tenantID string, armAuthorizer autorest.Authorizer, auth authentication.AuthenticationProvider) (*AzureClient, error) {
+func getClient(env azure.Environment, subscriptionID, tenantID string, credential azcore.TokenCredential, auth authentication.AuthenticationProvider) (*AzureClient, error) {
 	adapter, err := msgraphbetasdk.NewGraphRequestAdapter(auth)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request adapter")
+	}
+
+	// TODO(aramase) configure the cloud url for each client
+	roleAssignmentsClient, err := authorization.NewRoleAssignmentsClient(subscriptionID, credential, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create role assignments client")
+	}
+
+	roleDefinitionsClient, err := authorization.NewRoleDefinitionsClient(credential, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create role definitions client")
 	}
 
 	azClient := &AzureClient{
@@ -210,53 +217,11 @@ func getClient(env azure.Environment, subscriptionID, tenantID string, armAuthor
 
 		graphServiceClient: msgraphbetasdk.NewGraphServiceClient(adapter),
 
-		roleAssignmentsClient: authorization.NewRoleAssignmentsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
-		roleDefinitionsClient: authorization.NewRoleDefinitionsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
+		roleAssignmentsClient: roleAssignmentsClient,
+		roleDefinitionsClient: roleDefinitionsClient,
 	}
-
-	azClient.roleAssignmentsClient.Authorizer = armAuthorizer
-	azClient.roleDefinitionsClient.Authorizer = armAuthorizer
 
 	return azClient, nil
-}
-
-// GetTenantID figures out the AAD tenant ID of the subscription by making an
-// unauthenticated request to the Get Subscription Details endpoint and parses
-// the value from WWW-Authenticate header.
-// TODO this should probably to to the armhelpers library
-func GetTenantID(resourceManagerEndpoint string, subscriptionID string) (string, error) {
-	const hdrKey = "WWW-Authenticate"
-	c := subscriptions.NewClientWithBaseURI(resourceManagerEndpoint)
-
-	log.Debugf("Resolving tenantID for subscriptionID: %s", subscriptionID)
-
-	// we expect this request to fail (err != nil), but we are only interested
-	// in headers, so surface the error if the Response is not present (i.e.
-	// network error etc)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*150)
-	defer cancel()
-	subs, err := c.Get(ctx, subscriptionID)
-	if subs.Response.Response == nil {
-		return "", errors.Wrap(err, "Request failed")
-	}
-
-	// Expecting 401 StatusUnauthorized here, just read the header
-	if subs.StatusCode != http.StatusUnauthorized {
-		return "", errors.Errorf("Unexpected response from Get Subscription: %v", subs.StatusCode)
-	}
-	hdr := subs.Header.Get(hdrKey)
-	if hdr == "" {
-		return "", errors.Errorf("Header %v not found in Get Subscription response", hdrKey)
-	}
-
-	// Example value for hdr:
-	//   Bearer authorization_uri="https://login.windows.net/996fe9d1-6171-40aa-945b-4c64b63bf655", error="invalid_token", error_description="The authentication failed because of missing 'Authorization' header."
-	r := regexp.MustCompile(`authorization_uri=".*/([0-9a-f\-]+)"`)
-	m := r.FindStringSubmatch(hdr)
-	if m == nil {
-		return "", errors.Errorf("Could not find the tenant ID in header: %s %q", hdrKey, hdr)
-	}
-	return m[1], nil
 }
 
 func parseRsaPrivateKey(path string) (*rsa.PrivateKey, error) {
