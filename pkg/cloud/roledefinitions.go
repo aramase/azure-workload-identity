@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/services/preview/authorization/mgmt/2018-01-01-preview/authorization"
+	authorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
@@ -13,15 +13,22 @@ import (
 func (c *AzureClient) GetRoleDefinitionIDByName(ctx context.Context, scope, roleName string) (authorization.RoleDefinition, error) {
 	log.Debugf("Get role definition ID by name=%s", roleName)
 
-	roleDefinitionList, err := c.roleDefinitionsClient.List(ctx, scope, getRoleNameFilter(roleName))
-	if err != nil {
-		return authorization.RoleDefinition{}, errors.Wrap(err, "failed to list role definitions")
+	filter := getRoleNameFilter(roleName)
+	opts := &authorization.RoleDefinitionsClientListOptions{
+		Filter: &filter,
 	}
-	if len(roleDefinitionList.Values()) == 0 {
-		return authorization.RoleDefinition{}, errors.Errorf("role definition %s not found", roleName)
+	pager := c.roleDefinitionsClient.NewListPager(scope, opts)
+	for pager.More() {
+		nextResult, err := pager.NextPage(ctx)
+		if err != nil {
+			return authorization.RoleDefinition{}, errors.Wrap(err, "failed to list role definitions")
+		}
+		for _, r := range nextResult.Value {
+			return *r, nil
+		}
 	}
 
-	return roleDefinitionList.Values()[0], nil
+	return authorization.RoleDefinition{}, errors.Errorf("role definition %s not found", roleName)
 }
 
 // getRoleNameFilter returns a filter string for the given role name.

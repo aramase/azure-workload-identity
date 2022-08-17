@@ -6,18 +6,18 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"net/http"
 	"os"
-	"regexp"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	azidentity "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/services/preview/authorization/mgmt/2018-01-01-preview/authorization"
-	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2016-06-01/subscriptions"
-	"github.com/Azure/go-autorest/autorest"
+	authorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
+	subscriptions "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armsubscriptions"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/cli"
 	"github.com/microsoft/kiota/abstractions/go/authentication"
 	kiotaauth "github.com/microsoft/kiota/authentication/go/azure"
 	msgraphbetasdk "github.com/microsoftgraph/msgraph-beta-sdk-go"
@@ -61,27 +61,12 @@ type AzureClient struct {
 
 	graphServiceClient *msgraphbetasdk.GraphServiceClient
 
-	roleAssignmentsClient authorization.RoleAssignmentsClient
-	roleDefinitionsClient authorization.RoleDefinitionsClient
+	roleAssignmentsClient *authorization.RoleAssignmentsClient
+	roleDefinitionsClient *authorization.RoleDefinitionsClient
 }
 
 // NewAzureClientWithCLI creates an AzureClient configured from Azure CLI 2.0 for local development scenarios.
 func NewAzureClientWithCLI(env azure.Environment, subscriptionID, tenantID string) (*AzureClient, error) {
-	_, tenantID, err := getOAuthConfig(env, subscriptionID, tenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	token, err := cli.GetTokenFromCLI(env.ResourceManagerEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	adalToken, err := token.ToADALToken()
-	if err != nil {
-		return nil, err
-	}
-
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create credential")
@@ -91,21 +76,11 @@ func NewAzureClientWithCLI(env azure.Environment, subscriptionID, tenantID strin
 		return nil, errors.Wrap(err, "failed to create authentication provider")
 	}
 
-	return getClient(env, subscriptionID, tenantID, autorest.NewBearerAuthorizer(&adalToken), auth)
+	return getClient(env, subscriptionID, tenantID, cred, auth)
 }
 
 // NewAzureClientWithClientSecret returns an AzureClient via client_id and client_secret
 func NewAzureClientWithClientSecret(env azure.Environment, subscriptionID, clientID, clientSecret, tenantID string) (*AzureClient, error) {
-	oauthConfig, tenantID, err := getOAuthConfig(env, subscriptionID, tenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	armSpt, err := adal.NewServicePrincipalToken(*oauthConfig, clientID, clientSecret, env.ServiceManagementEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
 	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create credential")
@@ -115,7 +90,7 @@ func NewAzureClientWithClientSecret(env azure.Environment, subscriptionID, clien
 		return nil, errors.Wrap(err, "failed to create authentication provider")
 	}
 
-	return getClient(env, subscriptionID, tenantID, autorest.NewBearerAuthorizer(armSpt), auth)
+	return getClient(env, subscriptionID, tenantID, cred, auth)
 }
 
 // NewAzureClientWithClientCertificateFile returns an AzureClient via client_id and jwt certificate assertion
@@ -181,11 +156,6 @@ func newAzureClientWithCertificate(env azure.Environment, oauthConfig *adal.OAut
 		return nil, errors.New("privateKey should not be nil")
 	}
 
-	armSpt, err := adal.NewServicePrincipalTokenFromCertificate(*oauthConfig, clientID, certificate, privateKey, env.ServiceManagementEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
 	cred, err := azidentity.NewClientCertificateCredential(tenantID, clientID, []*x509.Certificate{certificate}, privateKey, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create credential")
@@ -195,13 +165,23 @@ func newAzureClientWithCertificate(env azure.Environment, oauthConfig *adal.OAut
 		return nil, errors.Wrap(err, "failed to create authentication provider")
 	}
 
-	return getClient(env, subscriptionID, tenantID, autorest.NewBearerAuthorizer(armSpt), auth)
+	return getClient(env, subscriptionID, tenantID, cred, auth)
 }
 
-func getClient(env azure.Environment, subscriptionID, tenantID string, armAuthorizer autorest.Authorizer, auth authentication.AuthenticationProvider) (*AzureClient, error) {
+func getClient(env azure.Environment, subscriptionID, tenantID string, cred azcore.TokenCredential, auth authentication.AuthenticationProvider) (*AzureClient, error) {
 	adapter, err := msgraphbetasdk.NewGraphRequestAdapter(auth)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request adapter")
+	}
+
+	// TODO(aramase) add the credential token provider and also set options
+	roleAssignmentsClient, err := authorization.NewRoleAssignmentsClient(subscriptionID, cred, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create role assignments client")
+	}
+	roleDefinitionsClient, err := authorization.NewRoleDefinitionsClient(cred, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create role definitions client")
 	}
 
 	azClient := &AzureClient{
@@ -210,12 +190,12 @@ func getClient(env azure.Environment, subscriptionID, tenantID string, armAuthor
 
 		graphServiceClient: msgraphbetasdk.NewGraphServiceClient(adapter),
 
-		roleAssignmentsClient: authorization.NewRoleAssignmentsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
-		roleDefinitionsClient: authorization.NewRoleDefinitionsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
-	}
+		// roleAssignmentsClient: authorization.NewRoleAssignmentsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
+		// roleDefinitionsClient: authorization.NewRoleDefinitionsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
 
-	azClient.roleAssignmentsClient.Authorizer = armAuthorizer
-	azClient.roleDefinitionsClient.Authorizer = armAuthorizer
+		roleAssignmentsClient: roleAssignmentsClient,
+		roleDefinitionsClient: roleDefinitionsClient,
+	}
 
 	return azClient, nil
 }
@@ -225,8 +205,15 @@ func getClient(env azure.Environment, subscriptionID, tenantID string, armAuthor
 // the value from WWW-Authenticate header.
 // TODO this should probably to to the armhelpers library
 func GetTenantID(resourceManagerEndpoint string, subscriptionID string) (string, error) {
-	const hdrKey = "WWW-Authenticate"
-	c := subscriptions.NewClientWithBaseURI(resourceManagerEndpoint)
+	opts := &arm.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Cloud: cloud.AzurePublic,
+		},
+	}
+	c, err := subscriptions.NewClient(&azidentity.AzureCLICredential{}, opts)
+	if err != nil {
+		return "", err
+	}
 
 	log.Debugf("Resolving tenantID for subscriptionID: %s", subscriptionID)
 
@@ -235,28 +222,15 @@ func GetTenantID(resourceManagerEndpoint string, subscriptionID string) (string,
 	// network error etc)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*150)
 	defer cancel()
-	subs, err := c.Get(ctx, subscriptionID)
-	if subs.Response.Response == nil {
+	subs, err := c.Get(ctx, subscriptionID, &subscriptions.ClientGetOptions{})
+	if err != nil {
+		return "", err
+	}
+	if subs.Subscription.TenantID == nil {
 		return "", errors.Wrap(err, "Request failed")
 	}
 
-	// Expecting 401 StatusUnauthorized here, just read the header
-	if subs.StatusCode != http.StatusUnauthorized {
-		return "", errors.Errorf("Unexpected response from Get Subscription: %v", subs.StatusCode)
-	}
-	hdr := subs.Header.Get(hdrKey)
-	if hdr == "" {
-		return "", errors.Errorf("Header %v not found in Get Subscription response", hdrKey)
-	}
-
-	// Example value for hdr:
-	//   Bearer authorization_uri="https://login.windows.net/996fe9d1-6171-40aa-945b-4c64b63bf655", error="invalid_token", error_description="The authentication failed because of missing 'Authorization' header."
-	r := regexp.MustCompile(`authorization_uri=".*/([0-9a-f\-]+)"`)
-	m := r.FindStringSubmatch(hdr)
-	if m == nil {
-		return "", errors.Errorf("Could not find the tenant ID in header: %s %q", hdrKey, hdr)
-	}
-	return m[1], nil
+	return *subs.Subscription.TenantID, nil
 }
 
 func parseRsaPrivateKey(path string) (*rsa.PrivateKey, error) {
