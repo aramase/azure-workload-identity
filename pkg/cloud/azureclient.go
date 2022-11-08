@@ -11,13 +11,13 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	azidentity "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/services/preview/authorization/mgmt/2018-01-01-preview/authorization"
+	authorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2016-06-01/subscriptions"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/cli"
 	"github.com/microsoft/kiota/abstractions/go/authentication"
 	kiotaauth "github.com/microsoft/kiota/authentication/go/azure"
 	msgraphbetasdk "github.com/microsoftgraph/msgraph-beta-sdk-go"
@@ -67,21 +67,6 @@ type AzureClient struct {
 
 // NewAzureClientWithCLI creates an AzureClient configured from Azure CLI 2.0 for local development scenarios.
 func NewAzureClientWithCLI(env azure.Environment, subscriptionID, tenantID string) (*AzureClient, error) {
-	_, tenantID, err := getOAuthConfig(env, subscriptionID, tenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	token, err := cli.GetTokenFromCLI(env.ResourceManagerEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	adalToken, err := token.ToADALToken()
-	if err != nil {
-		return nil, err
-	}
-
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create credential")
@@ -91,21 +76,11 @@ func NewAzureClientWithCLI(env azure.Environment, subscriptionID, tenantID strin
 		return nil, errors.Wrap(err, "failed to create authentication provider")
 	}
 
-	return getClient(env, subscriptionID, tenantID, autorest.NewBearerAuthorizer(&adalToken), auth)
+	return getClient(env, subscriptionID, tenantID, cred, auth)
 }
 
 // NewAzureClientWithClientSecret returns an AzureClient via client_id and client_secret
 func NewAzureClientWithClientSecret(env azure.Environment, subscriptionID, clientID, clientSecret, tenantID string) (*AzureClient, error) {
-	oauthConfig, tenantID, err := getOAuthConfig(env, subscriptionID, tenantID)
-	if err != nil {
-		return nil, err
-	}
-
-	armSpt, err := adal.NewServicePrincipalToken(*oauthConfig, clientID, clientSecret, env.ServiceManagementEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
 	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create credential")
@@ -198,11 +173,13 @@ func newAzureClientWithCertificate(env azure.Environment, oauthConfig *adal.OAut
 	return getClient(env, subscriptionID, tenantID, autorest.NewBearerAuthorizer(armSpt), auth)
 }
 
-func getClient(env azure.Environment, subscriptionID, tenantID string, armAuthorizer autorest.Authorizer, auth authentication.AuthenticationProvider) (*AzureClient, error) {
+func getClient(env azure.Environment, subscriptionID, tenantID string, credential azcore.TokenCredential, auth authentication.AuthenticationProvider) (*AzureClient, error) {
 	adapter, err := msgraphbetasdk.NewGraphRequestAdapter(auth)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request adapter")
 	}
+
+	// roleAssignmentsClient := authorization.NewRoleAssignmentsClient(subscriptionID, )
 
 	azClient := &AzureClient{
 		environment:    env,
@@ -210,12 +187,12 @@ func getClient(env azure.Environment, subscriptionID, tenantID string, armAuthor
 
 		graphServiceClient: msgraphbetasdk.NewGraphServiceClient(adapter),
 
-		roleAssignmentsClient: authorization.NewRoleAssignmentsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
-		roleDefinitionsClient: authorization.NewRoleDefinitionsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
+		// roleAssignmentsClient: authorization.NewRoleAssignmentsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
+		// roleDefinitionsClient: authorization.NewRoleDefinitionsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID),
 	}
 
-	azClient.roleAssignmentsClient.Authorizer = armAuthorizer
-	azClient.roleDefinitionsClient.Authorizer = armAuthorizer
+	// azClient.roleAssignmentsClient.Authorizer = armAuthorizer
+	// azClient.roleDefinitionsClient.Authorizer = armAuthorizer
 
 	return azClient, nil
 }

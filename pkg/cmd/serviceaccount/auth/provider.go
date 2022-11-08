@@ -107,6 +107,7 @@ func (a *authArgs) Validate() error {
 		a.subscriptionID = subID
 	}
 
+	azureEnv, err := cloud.
 	env, err := azure.EnvironmentFromName(a.rawAzureEnvironment)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse --azure-env as a valid target Azure cloud environment")
