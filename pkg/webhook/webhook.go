@@ -67,6 +67,10 @@ func NewPodMutator(client client.Client, reader client.Reader, audience string) 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get AAD endpoint")
 	}
+	sr, err := newStatsReporter()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create stats reporter")
+	}
 
 	return &podMutator{
 		client:             client,
@@ -74,7 +78,7 @@ func NewPodMutator(client client.Client, reader client.Reader, audience string) 
 		config:             c,
 		audience:           audience,
 		azureAuthorityHost: azureAuthorityHost,
-		reporter:           newStatsReporter(),
+		reporter:           sr,
 	}, nil
 }
 
