@@ -21,17 +21,17 @@ import (
 )
 
 const (
-	// "/metadata" portion is case-insensitive in IMDS
+	// "/metadata" portion is case-insensitive in IMDS.
 	tokenPathPrefix = "/{type:(?i:metadata)}/identity/oauth2/token" // #nosec
 
-	// readyzPathPrefix is the path for readiness probe
+	// readyzPathPrefix is the path for readiness probe.
 	readyzPathPrefix = "/readyz"
 
-	// metadataIPAddress is the IP address of the metadata service
+	// metadataIPAddress is the IP address of the metadata service.
 	metadataIPAddress = "169.254.169.254"
-	// metadataPort is the port of the metadata service
+	// metadataPort is the port of the metadata service.
 	metadataPort = 80
-	// localhost is the hostname of the localhost
+	// localhost is the hostname of the localhost.
 	localhost = "localhost"
 )
 
@@ -51,7 +51,7 @@ type proxy struct {
 }
 
 // using this from https://github.com/Azure/go-autorest/blob/b3899c1057425994796c92293e931f334af63b4e/autorest/adal/token.go#L1055-L1067
-// this struct works with the adal sdks used in clients and azure-cli token requests
+// this struct works with the adal sdks used in clients and azure-cli token requests.
 type token struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
@@ -66,7 +66,7 @@ type token struct {
 	Type     string `json:"token_type"`
 }
 
-// NewProxy returns a proxy instance
+// NewProxy returns a proxy instance.
 func NewProxy(port int, logger mlog.Logger) (Proxy, error) {
 	// tenantID is required for fetching a token using client assertions
 	// the mutating webhook will inject the tenantID for the cluster
@@ -87,7 +87,7 @@ func NewProxy(port int, logger mlog.Logger) (Proxy, error) {
 	}, nil
 }
 
-// Run runs the proxy server
+// Run runs the proxy server.
 func (p *proxy) Run(ctx context.Context) error {
 	rtr := mux.NewRouter()
 	rtr.PathPrefix(tokenPathPrefix).HandlerFunc(p.msiHandler)
@@ -254,7 +254,7 @@ func readJWTFromFS(tokenFilePath string) (string, error) {
 // If the scope is "http://database.windows.net//.default", the resource identifier is "http://database.windows.net/".
 func getScope(resource string) string {
 	if !strings.HasSuffix(resource, "/.default") {
-		resource = resource + "/.default"
+		resource += "/.default"
 	}
 	return resource
 }

@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	// ExporterName is the name of the exporter
+	// ExporterName is the name of the exporter.
 	ExporterName = "prometheus"
 )
 

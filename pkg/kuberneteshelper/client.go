@@ -31,7 +31,7 @@ func init() {
 	metav1.AddToGroupVersion(scheme, aadPodIdentityGroupVersion)
 }
 
-// GetKubeConfig returns the kubeconfig
+// GetKubeConfig returns the kubeconfig.
 func GetKubeConfig() (*rest.Config, error) {
 	return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(clientcmd.NewDefaultClientConfigLoadingRules(), &clientcmd.ConfigOverrides{}).ClientConfig()
 }

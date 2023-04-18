@@ -149,10 +149,11 @@ func (dc *detectCmd) run() error {
 	if err != nil {
 		return err
 	}
-	azureIdentityMap := make(map[string]aadpodv1.AzureIdentity)
-	for _, azureIdentity := range azureIdentities {
+	azureIdentityMap := make(map[string]*aadpodv1.AzureIdentity)
+	for idx := range azureIdentities {
+		azureIdentity := azureIdentities[idx]
 		if azureIdentity.Spec.Type == aadpodv1.UserAssignedMSI {
-			azureIdentityMap[azureIdentity.Name] = azureIdentity
+			azureIdentityMap[azureIdentity.Name] = &azureIdentity
 		}
 	}
 
@@ -195,7 +196,7 @@ func (dc *detectCmd) run() error {
 	}
 
 	for ownerReference, clientID := range ownerReferences {
-		owner, err := dc.getOwner(ownerReference)
+		owner, err := dc.getOwner(&ownerReference)
 		if err != nil {
 			return err
 		}
@@ -239,7 +240,7 @@ func (dc *detectCmd) run() error {
 //     to generate the desired yaml file
 //
 // The service account yaml will contain the workload identity use label ("azure.workload.identity/use: true")
-// and the client-id annotation ("azure.workload.identity/client-id: <client-id from AzureIdentity>")
+// and the client-id annotation ("azure.workload.identity/client-id: <client-id from AzureIdentity>").
 func (dc *detectCmd) createServiceAccountFile(name, ownerName, clientID string) (*corev1.ServiceAccount, error) {
 	sa := &corev1.ServiceAccount{}
 	var err error
@@ -270,7 +271,7 @@ func (dc *detectCmd) createServiceAccountFile(name, ownerName, clientID string) 
 	sa.SetGroupVersionKind(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "ServiceAccount"})
 	sa.SetResourceVersion("")
 
-	fileName := filepath.Join(dc.getServiceAccountFileName(ownerName))
+	fileName := dc.getServiceAccountFileName(ownerName)
 	// write the service account yaml file
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -288,7 +289,7 @@ func (dc *detectCmd) createServiceAccountFile(name, ownerName, clientID string) 
 //
 // The resource yaml will contain:
 // 1. proxy container that is required for migration
-// 2. proxy-init init container that sets up iptables rules to redirect IMDS traffic to proxy
+// 2. proxy-init init container that sets up iptables rules to redirect IMDS traffic to proxy.
 func (dc *detectCmd) createResourceFile(localObject k8s.LocalObject, sa *corev1.ServiceAccount) error {
 	// add the init container to the container list
 	localObject.SetInitContainers(dc.addProxyInitContainer(localObject.GetInitContainers()))
@@ -318,7 +319,7 @@ func (dc *detectCmd) createResourceFile(localObject k8s.LocalObject, sa *corev1.
 	return dc.serializer.Encode(localObject.GetObject(), file)
 }
 
-// addProxyInitContainer adds the proxy-init container to the list of init containers
+// addProxyInitContainer adds the proxy-init container to the list of init containers.
 func (dc *detectCmd) addProxyInitContainer(initContainers []corev1.Container) []corev1.Container {
 	if initContainers == nil {
 		initContainers = make([]corev1.Container, 0)
@@ -358,7 +359,7 @@ func (dc *detectCmd) addProxyInitContainer(initContainers []corev1.Container) []
 	return initContainers
 }
 
-// addProxyContainer adds the proxy container to the list of containers
+// addProxyContainer adds the proxy container to the list of containers.
 func (dc *detectCmd) addProxyContainer(containers []corev1.Container) []corev1.Container {
 	if containers == nil {
 		containers = make([]corev1.Container, 0)
@@ -403,8 +404,8 @@ func (dc *detectCmd) addProxyContainer(containers []corev1.Container) []corev1.C
 }
 
 // getOwner returns the owner of the resource
-// It makes a recursive call to get the top level owner of the resource
-func (dc *detectCmd) getOwner(ownerRef metav1.OwnerReference) (owner client.Object, err error) {
+// It makes a recursive call to get the top level owner of the resource.
+func (dc *detectCmd) getOwner(ownerRef *metav1.OwnerReference) (owner client.Object, err error) {
 	mlog.Debug("getting owner reference", "name", ownerRef.Name)
 	or, err := dc.getOwnerObject(ownerRef)
 	if err != nil {
@@ -413,14 +414,14 @@ func (dc *detectCmd) getOwner(ownerRef metav1.OwnerReference) (owner client.Obje
 	owners := or.GetOwnerReferences()
 	for _, o := range owners {
 		if o.Controller != nil && *o.Controller {
-			return dc.getOwner(o)
+			return dc.getOwner(&o)
 		}
 	}
 	return or, nil
 }
 
-// getOwnerObject gets the owner object based on the owner reference kind
-func (dc *detectCmd) getOwnerObject(ownerRef metav1.OwnerReference) (client.Object, error) {
+// getOwnerObject gets the owner object based on the owner reference kind.
+func (dc *detectCmd) getOwnerObject(ownerRef *metav1.OwnerReference) (client.Object, error) {
 	switch ownerRef.Kind {
 	case "Deployment":
 		return kuberneteshelper.GetObject(context.TODO(), dc.kubeClient, dc.namespace, ownerRef.Name, &appsv1.Deployment{})
@@ -450,9 +451,9 @@ func (dc *detectCmd) getServiceAccountFileName(prefix string) string {
 }
 
 // filterAzureIdentities will filter out the Azure identities referenced in AzureIdentityBinding
-// the return value is a map of selector used in AzureIdentityBinding to the AzureIdentity
-func filterAzureIdentities(bindings []aadpodv1.AzureIdentityBinding, identities map[string]aadpodv1.AzureIdentity) map[string]aadpodv1.AzureIdentity {
-	labelsToAzureIdentityMap := make(map[string]aadpodv1.AzureIdentity)
+// the return value is a map of selector used in AzureIdentityBinding to the AzureIdentity.
+func filterAzureIdentities(bindings []aadpodv1.AzureIdentityBinding, identities map[string]*aadpodv1.AzureIdentity) map[string]*aadpodv1.AzureIdentity {
+	labelsToAzureIdentityMap := make(map[string]*aadpodv1.AzureIdentity)
 	for _, binding := range bindings {
 		if binding.Spec.Selector == "" || binding.Spec.AzureIdentity == "" {
 			continue

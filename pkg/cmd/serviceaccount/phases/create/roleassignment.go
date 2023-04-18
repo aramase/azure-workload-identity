@@ -18,7 +18,7 @@ const (
 type roleAssignmentPhase struct {
 }
 
-// NewRoleAssignmentPhase creates a new phase to create role assignment
+// NewRoleAssignmentPhase creates a new phase to create role assignment.
 func NewRoleAssignmentPhase() workflow.Phase {
 	p := &roleAssignmentPhase{}
 	return workflow.Phase{

@@ -614,9 +614,9 @@ func TestAddEnvironmentVariables(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actualContainer := addEnvironmentVariables(test.container, "clientID", "tenantID", "https://login.microsoftonline.com/")
-			if !reflect.DeepEqual(actualContainer, test.expectedContainer) {
-				t.Fatalf("expected: %v, got: %v", test.expectedContainer, actualContainer)
+			addEnvironmentVariables(&test.container, "clientID", "tenantID", "https://login.microsoftonline.com/")
+			if !reflect.DeepEqual(test.container, test.expectedContainer) {
+				t.Fatalf("expected: %v, got: %v", test.expectedContainer, test.container)
 			}
 		})
 	}
@@ -701,9 +701,9 @@ func TestAddProjectServiceAccountTokenVolumeMount(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			actualContainer := addProjectedTokenVolumeMount(test.container)
-			if !reflect.DeepEqual(actualContainer, test.expectedContainer) {
-				t.Fatalf("expected: %v, got: %v", test.expectedContainer, actualContainer)
+			addProjectedTokenVolumeMount(&test.container)
+			if !reflect.DeepEqual(test.container, test.expectedContainer) {
+				t.Fatalf("expected: %v, got: %v", test.expectedContainer, test.container)
 			}
 		})
 	}

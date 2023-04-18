@@ -39,7 +39,7 @@ var (
 // +kubebuilder:rbac:groups="",namespace=azure-workload-identity-system,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=admissionregistration.k8s.io,resources=mutatingwebhookconfigurations,verbs=get;list;watch;update
 
-// podMutator mutates pod objects to add project service account token volume
+// podMutator mutates pod objects to add project service account token volume.
 type podMutator struct {
 	client client.Client
 	// reader is an instance of mgr.GetAPIReader that is configured to use the API server.
@@ -51,7 +51,7 @@ type podMutator struct {
 	azureAuthorityHost string
 }
 
-// NewPodMutator returns a pod mutation handler
+// NewPodMutator returns a pod mutation handler.
 func NewPodMutator(client client.Client, reader client.Reader, audience string) (admission.Handler, error) {
 	c, err := config.ParseConfig()
 	if err != nil {
@@ -80,7 +80,8 @@ func NewPodMutator(client client.Client, reader client.Reader, audience string) 
 	}, nil
 }
 
-// PodMutator adds projected service account volume for incoming pods if service account is annotated
+// PodMutator adds projected service account volume for incoming pods if service account is annotated.
+// nolint: gocritic // Must accept admission.Request as a struct to satisfy Handler interface.
 func (m *podMutator) Handle(ctx context.Context, req admission.Request) (response admission.Response) {
 	timeStart := time.Now()
 	defer func() {
@@ -167,32 +168,34 @@ func (m *podMutator) Handle(ctx context.Context, req admission.Request) (respons
 // PodMutator implements admission.DecoderInjector
 // A decoder will be automatically injected
 
-// InjectDecoder injects the decoder
+// InjectDecoder injects the decoder.
 func (m *podMutator) InjectDecoder(d *admission.Decoder) error {
 	m.decoder = d
 	return nil
 }
 
 // mutateContainers mutates the containers by injecting the projected
-// service account token volume and environment variables
+// service account token volume and environment variables.
 func (m *podMutator) mutateContainers(containers []corev1.Container, clientID string, tenantID string, skipContainers map[string]struct{}) []corev1.Container {
 	for i := range containers {
 		// container is in the skip list
 		if _, ok := skipContainers[containers[i].Name]; ok {
 			continue
 		}
+		c := &containers[i]
 		// add environment variables to container if not exists
-		containers[i] = addEnvironmentVariables(containers[i], clientID, tenantID, m.azureAuthorityHost)
+		addEnvironmentVariables(c, clientID, tenantID, m.azureAuthorityHost)
 		// add the volume mount if not exists
-		containers[i] = addProjectedTokenVolumeMount(containers[i])
+		addProjectedTokenVolumeMount(c)
+		containers[i] = *c
 	}
 	return containers
 }
 
 func (m *podMutator) injectProxyInitContainer(containers []corev1.Container, proxyPort int32) []corev1.Container {
 	imageRepository := strings.Join([]string{ProxyImageRegistry, ProxyInitImageName}, "/")
-	for _, container := range containers {
-		if strings.HasPrefix(container.Image, imageRepository) || container.Name == ProxyInitContainerName {
+	for idx := range containers {
+		if strings.HasPrefix(containers[idx].Image, imageRepository) || containers[idx].Name == ProxyInitContainerName {
 			return containers
 		}
 	}
@@ -221,8 +224,8 @@ func (m *podMutator) injectProxyInitContainer(containers []corev1.Container, pro
 
 func (m *podMutator) injectProxySidecarContainer(containers []corev1.Container, proxyPort int32) []corev1.Container {
 	imageRepository := strings.Join([]string{ProxyImageRegistry, ProxySidecarImageName}, "/")
-	for _, container := range containers {
-		if strings.HasPrefix(container.Image, imageRepository) || container.Name == ProxySidecarContainerName {
+	for idx := range containers {
+		if strings.HasPrefix(containers[idx].Image, imageRepository) || containers[idx].Name == ProxySidecarContainerName {
 			return containers
 		}
 	}
@@ -273,7 +276,7 @@ func shouldInjectProxySidecar(pod *corev1.Pod) bool {
 	return ok
 }
 
-// getSkipContainers gets the list of containers to skip based on the annotation
+// getSkipContainers gets the list of containers to skip based on the annotation.
 func getSkipContainers(pod *corev1.Pod) map[string]struct{} {
 	skipContainers := pod.Annotations[SkipContainersAnnotation]
 	if len(skipContainers) == 0 {
@@ -312,7 +315,7 @@ func getServiceAccountTokenExpiration(pod *corev1.Pod, sa *corev1.ServiceAccount
 	return serviceAccountTokenExpiration, nil
 }
 
-// getProxyPort returns the port for the proxy init container and the proxy sidecar container
+// getProxyPort returns the port for the proxy init container and the proxy sidecar container.
 func getProxyPort(pod *corev1.Pod) (int32, error) {
 	if len(pod.Annotations) == 0 {
 		return DefaultProxySidecarPort, nil
@@ -335,12 +338,12 @@ func validServiceAccountTokenExpiry(tokenExpiry int64) bool {
 	return tokenExpiry <= MaxServiceAccountTokenExpiration && tokenExpiry >= MinServiceAccountTokenExpiration
 }
 
-// getClientID returns the clientID to be configured
+// getClientID returns the clientID to be configured.
 func getClientID(sa *corev1.ServiceAccount) string {
 	return sa.Annotations[ClientIDAnnotation]
 }
 
-// getTenantID returns the tenantID to be configured
+// getTenantID returns the tenantID to be configured.
 func getTenantID(sa *corev1.ServiceAccount, c *config.Config) string {
 	// use tenantID if provided in the annotation
 	if tenantID, ok := sa.Annotations[TenantIDAnnotation]; ok {
@@ -350,8 +353,8 @@ func getTenantID(sa *corev1.ServiceAccount, c *config.Config) string {
 	return c.TenantID
 }
 
-// addEnvironmentVariables adds the clientID, tenantID and token file path environment variables needed for SDK
-func addEnvironmentVariables(container corev1.Container, clientID, tenantID, azureAuthorityHost string) corev1.Container {
+// addEnvironmentVariables adds the clientID, tenantID and token file path environment variables needed for SDK.
+func addEnvironmentVariables(container *corev1.Container, clientID, tenantID, azureAuthorityHost string) {
 	m := make(map[string]string)
 	for _, env := range container.Env {
 		m[env.Name] = env.Value
@@ -372,15 +375,13 @@ func addEnvironmentVariables(container corev1.Container, clientID, tenantID, azu
 	if _, ok := m[AzureAuthorityHostEnvVar]; !ok {
 		container.Env = append(container.Env, corev1.EnvVar{Name: AzureAuthorityHostEnvVar, Value: azureAuthorityHost})
 	}
-
-	return container
 }
 
-// addProjectedTokenVolumeMount adds the projected token volume mount for the container
-func addProjectedTokenVolumeMount(container corev1.Container) corev1.Container {
+// addProjectedTokenVolumeMount adds the projected token volume mount for the container.
+func addProjectedTokenVolumeMount(container *corev1.Container) {
 	for _, volume := range container.VolumeMounts {
 		if volume.Name == TokenFilePathName {
-			return container
+			return
 		}
 	}
 	container.VolumeMounts = append(container.VolumeMounts,
@@ -389,13 +390,12 @@ func addProjectedTokenVolumeMount(container corev1.Container) corev1.Container {
 			MountPath: TokenFileMountPath,
 			ReadOnly:  true,
 		})
-
-	return container
 }
 
 func addProjectedServiceAccountTokenVolume(pod *corev1.Pod, serviceAccountTokenExpiration int64, audience string) error {
 	// add the projected service account token volume to the pod if not exists
-	for _, volume := range pod.Spec.Volumes {
+	for idx := range pod.Spec.Volumes {
+		volume := &pod.Spec.Volumes[idx]
 		if volume.Projected == nil {
 			continue
 		}

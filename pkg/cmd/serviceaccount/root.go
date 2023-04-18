@@ -6,7 +6,7 @@ import (
 	"github.com/Azure/azure-workload-identity/pkg/cmd/serviceaccount/auth"
 )
 
-// NewServiceAccountCmd returns a new serviceaccount command
+// NewServiceAccountCmd returns a new serviceaccount command.
 func NewServiceAccountCmd() *cobra.Command {
 	authProvider := auth.NewProvider()
 	serviceAccountCmd := &cobra.Command{

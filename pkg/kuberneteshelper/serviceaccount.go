@@ -14,7 +14,7 @@ import (
 )
 
 // Create ServiceAccount in the cluster
-// If the ServiceAccount already exists, error is returned
+// If the ServiceAccount already exists, error is returned.
 func CreateOrUpdateServiceAccount(ctx context.Context, kubeClient client.Client, namespace, name, clientID, tenantID string, tokenExpiration time.Duration) error {
 	sa := &corev1.ServiceAccount{
 		ObjectMeta: metav1.ObjectMeta{
@@ -39,7 +39,7 @@ func CreateOrUpdateServiceAccount(ctx context.Context, kubeClient client.Client,
 	return err
 }
 
-// Delete ServiceAccount in the cluster
+// Delete ServiceAccount in the cluster.
 func DeleteServiceAccount(ctx context.Context, kubeClient client.Client, namespace, name string) error {
 	sa := &corev1.ServiceAccount{}
 	if err := kubeClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, sa); err != nil {
@@ -48,7 +48,7 @@ func DeleteServiceAccount(ctx context.Context, kubeClient client.Client, namespa
 	return kubeClient.Delete(ctx, sa)
 }
 
-// Get ServiceAccount in the cluster
+// Get ServiceAccount in the cluster.
 func GetServiceAccount(ctx context.Context, kubeClient client.Client, namespace, name string) (*corev1.ServiceAccount, error) {
 	sa := &corev1.ServiceAccount{}
 	err := kubeClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, sa)

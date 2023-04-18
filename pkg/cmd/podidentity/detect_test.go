@@ -507,7 +507,7 @@ func TestFilterAzureIdentities(t *testing.T) {
 	tests := []struct {
 		name                  string
 		azureIdentityBindings []aadpodv1.AzureIdentityBinding
-		azureIdentities       map[string]aadpodv1.AzureIdentity
+		azureIdentities       map[string]*aadpodv1.AzureIdentity
 		expected              map[string]aadpodv1.AzureIdentity
 	}{
 		{
@@ -549,7 +549,7 @@ func TestFilterAzureIdentities(t *testing.T) {
 					},
 				},
 			},
-			azureIdentities: map[string]aadpodv1.AzureIdentity{
+			azureIdentities: map[string]*aadpodv1.AzureIdentity{
 				"identity-1": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "identity-1",
@@ -606,7 +606,7 @@ func TestFilterAzureIdentities(t *testing.T) {
 					},
 				},
 			},
-			azureIdentities: map[string]aadpodv1.AzureIdentity{
+			azureIdentities: map[string]*aadpodv1.AzureIdentity{
 				"identity-1": {
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "identity-1",

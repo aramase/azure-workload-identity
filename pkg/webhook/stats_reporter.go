@@ -35,6 +35,5 @@ func registerMetrics() error {
 
 // ReportRequest reports the request duration for the given namespace.
 func ReportRequest(ctx context.Context, namespace string, duration time.Duration) {
-	l := append(labels, attribute.String(namespaceKey, namespace))
-	req.Record(ctx, duration.Seconds(), l...)
+	req.Record(ctx, duration.Seconds(), append(labels, attribute.String(namespaceKey, namespace))...)
 }

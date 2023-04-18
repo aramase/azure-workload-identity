@@ -25,7 +25,7 @@ func (c *AzureClient) GetRoleDefinitionIDByName(ctx context.Context, scope, role
 }
 
 // getRoleNameFilter returns a filter string for the given role name.
-// Supported filters are either roleName eq '{value}' or type eq 'BuiltInRole|CustomRole'."
+// Supported filters are either roleName eq '{value}' or type eq 'BuiltInRole|CustomRole'.".
 func getRoleNameFilter(roleName string) string {
 	return fmt.Sprintf("roleName eq '%s'", roleName)
 }

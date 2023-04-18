@@ -37,7 +37,7 @@ func newDeleteCmd(authProvider auth.Provider) *cobra.Command {
 			// if we are running the AAD application delete phase, we can
 			// slightly optimize the delete command by skipping the federated-identity
 			// phase because it will get removed when the AAD application is removed.
-			if deleteRunner.IsPhaseActive(aadApplicationPhase) {
+			if deleteRunner.IsPhaseActive(&aadApplicationPhase) {
 				deleteRunner.AppendSkipPhases(federatedIdentityPhase)
 			}
 			return deleteRunner.Run(data)
@@ -65,7 +65,7 @@ func newDeleteCmd(authProvider auth.Provider) *cobra.Command {
 }
 
 // deleteData is an implementation of phases.DeleteData in
-// pkg/cmd/serviceaccount/phases/delete/data.go
+// pkg/cmd/serviceaccount/phases/delete/data.go.
 type deleteData struct {
 	serviceAccountName      string
 	serviceAccountNamespace string

@@ -5,13 +5,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Config holds configuration from the env variables
+// Config holds configuration from the env variables.
 type Config struct {
 	Cloud    string `envconfig:"AZURE_ENVIRONMENT"`
 	TenantID string `envconfig:"AZURE_TENANT_ID"`
 }
 
-// ParseConfig parses the configuration from env variables
+// ParseConfig parses the configuration from env variables.
 func ParseConfig() (*Config, error) {
 	c := new(Config)
 	if err := envconfig.Process("config", c); err != nil {
@@ -25,7 +25,7 @@ func ParseConfig() (*Config, error) {
 	return c, nil
 }
 
-// validateConfig validates the configuration
+// validateConfig validates the configuration.
 func validateConfig(c *Config) error {
 	if c.TenantID == "" {
 		return errors.New("tenant ID is required")

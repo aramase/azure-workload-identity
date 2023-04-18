@@ -22,7 +22,7 @@ type serviceAccountPhase struct {
 	kubeClient client.Client
 }
 
-// NewServiceAccountPhase creates a new phase to create a Kubernetes service account
+// NewServiceAccountPhase creates a new phase to create a Kubernetes service account.
 func NewServiceAccountPhase() workflow.Phase {
 	p := &serviceAccountPhase{}
 	return workflow.Phase{

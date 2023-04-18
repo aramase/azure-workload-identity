@@ -17,7 +17,7 @@ const (
 type aadApplicationPhase struct {
 }
 
-// NewAADApplicationPhase creates a new phase to delete an AAD application
+// NewAADApplicationPhase creates a new phase to delete an AAD application.
 func NewAADApplicationPhase() workflow.Phase {
 	p := &aadApplicationPhase{}
 	return workflow.Phase{

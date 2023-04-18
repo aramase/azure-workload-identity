@@ -48,7 +48,7 @@ func IsFederatedCredentialNotFound(err error) bool {
 }
 
 // IsFederatedCredentialAlreadyExists returns true if the given error is a federated credential already exists error.
-// E1202 22:40:05.500821  867104 main.go:57] "failed to add federated identity credential" err="code: Request_MultipleObjectsWithSameKeyValue, message: FederatedIdentityCredential with name aramase-default-cred already exists."
+// E1202 22:40:05.500821  867104 main.go:57] "failed to add federated identity credential" err="code: Request_MultipleObjectsWithSameKeyValue, message: FederatedIdentityCredential with name aramase-default-cred already exists.".
 func IsFederatedCredentialAlreadyExists(err error) bool {
 	gerr := GraphError{}
 	return errors.As(err, &gerr) && *gerr.PublicError.GetCode() == GraphErrorCodeMultipleObjectsWithSameKeyValue

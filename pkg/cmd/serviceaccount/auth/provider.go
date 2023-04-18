@@ -30,7 +30,7 @@ const (
 	cliAuthMethod               = "cli"
 )
 
-// Provider is an interface for getting an Azure client
+// Provider is an interface for getting an Azure client.
 type Provider interface {
 	AddFlags(f *pflag.FlagSet)
 	GetAzureClient() cloud.Interface
@@ -38,7 +38,7 @@ type Provider interface {
 	Validate() error
 }
 
-// authArgs is an implementation of the Provider interface
+// authArgs is an implementation of the Provider interface.
 type authArgs struct {
 	rawAzureEnvironment string
 	rawSubscriptionID   string
@@ -56,7 +56,7 @@ type authArgs struct {
 	client *http.Client
 }
 
-// NewProvider returns a new authArgs
+// NewProvider returns a new authArgs.
 func NewProvider() Provider {
 	return &authArgs{client: defaultClient()}
 }
@@ -109,7 +109,7 @@ func (d *delayDebugWrappers) RoundTrip(req *http.Request) (*http.Response, error
 	return rt.RoundTrip(req)
 }
 
-// copied from MS SDK so we can inject custom base round tripper
+// copied from MS SDK so we can inject custom base round tripper.
 type middlewarePipeline struct {
 	transport   http.RoundTripper
 	middlewares []nethttplibrary.Middleware
@@ -135,7 +135,7 @@ func (p *middlewarePipeline) RoundTrip(req *http.Request) (*http.Response, error
 	return p.Next(req, 0)
 }
 
-// AddFlags adds the flags for this package to the specified FlagSet
+// AddFlags adds the flags for this package to the specified FlagSet.
 func (a *authArgs) AddFlags(f *pflag.FlagSet) {
 	f.StringVar(&a.rawAzureEnvironment, "azure-env", "AzurePublicCloud", "the target Azure cloud")
 	f.StringVarP(&a.rawSubscriptionID, "subscription-id", "s", "", "azure subscription id (required)")
@@ -146,17 +146,17 @@ func (a *authArgs) AddFlags(f *pflag.FlagSet) {
 	f.StringVar(&a.privateKeyPath, "private-key-path", "", "path to private key (used with --auth-method=client_certificate)")
 }
 
-// GetAzureClient returns an Azure client
+// GetAzureClient returns an Azure client.
 func (a *authArgs) GetAzureClient() cloud.Interface {
 	return a.azureClient
 }
 
-// GetAzureTenantID returns the Azure tenant ID
+// GetAzureTenantID returns the Azure tenant ID.
 func (a *authArgs) GetAzureTenantID() string {
 	return a.tenantID
 }
 
-// Validate validates the authArgs
+// Validate validates the authArgs.
 func (a *authArgs) Validate() error {
 	var err error
 
@@ -203,11 +203,11 @@ func (a *authArgs) Validate() error {
 
 	switch a.authMethod {
 	case cliAuthMethod:
-		a.azureClient, err = cloud.NewAzureClientWithCLI(env, a.subscriptionID.String(), a.tenantID, a.client)
+		a.azureClient, err = cloud.NewAzureClientWithCLI(&env, a.subscriptionID.String(), a.tenantID, a.client)
 	case clientSecretAuthMethod:
-		a.azureClient, err = cloud.NewAzureClientWithClientSecret(env, a.subscriptionID.String(), a.clientID.String(), a.clientSecret, a.tenantID, a.client)
+		a.azureClient, err = cloud.NewAzureClientWithClientSecret(&env, a.subscriptionID.String(), a.clientID.String(), a.clientSecret, a.tenantID, a.client)
 	case clientCertificateAuthMethod:
-		a.azureClient, err = cloud.NewAzureClientWithClientCertificateFile(env, a.subscriptionID.String(), a.clientID.String(), a.tenantID, a.certificatePath, a.privateKeyPath, a.client)
+		a.azureClient, err = cloud.NewAzureClientWithClientCertificateFile(&env, a.subscriptionID.String(), a.clientID.String(), a.tenantID, a.certificatePath, a.privateKeyPath, a.client)
 	default:
 		err = errors.Errorf("--auth-method: ERROR: method unsupported. method=%q", a.authMethod)
 	}
@@ -215,7 +215,7 @@ func (a *authArgs) Validate() error {
 	return err
 }
 
-// getSubFromAzDir returns the subscription ID from the Azure CLI directory
+// getSubFromAzDir returns the subscription ID from the Azure CLI directory.
 func getSubFromAzDir(root string) (uuid.UUID, error) {
 	subConfig, err := ini.Load(filepath.Join(root, "clouds.config"))
 	if err != nil {
@@ -231,7 +231,7 @@ func getSubFromAzDir(root string) (uuid.UUID, error) {
 	return getCloudSubFromAzConfig(cloud, subConfig)
 }
 
-// getSelectedCloudFromAzConfig returns the selected cloud from the Azure CLI config
+// getSelectedCloudFromAzConfig returns the selected cloud from the Azure CLI config.
 func getSelectedCloudFromAzConfig(f *ini.File) string {
 	selectedCloud := "AzureCloud"
 	if cloud, err := f.GetSection("cloud"); err == nil {
@@ -244,7 +244,7 @@ func getSelectedCloudFromAzConfig(f *ini.File) string {
 	return selectedCloud
 }
 
-// getCloudSubFromAzConfig returns the subscription ID from the Azure CLI config
+// getCloudSubFromAzConfig returns the subscription ID from the Azure CLI config.
 func getCloudSubFromAzConfig(cloud string, f *ini.File) (uuid.UUID, error) {
 	cfg, err := f.GetSection(cloud)
 	if err != nil {
@@ -257,7 +257,7 @@ func getCloudSubFromAzConfig(cloud string, f *ini.File) (uuid.UUID, error) {
 	return uuid.Parse(sub.String())
 }
 
-// getHomeDir attempts to get the home dir from env
+// getHomeDir attempts to get the home dir from env.
 func getHomeDir() string {
 	if runtime.GOOS == "windows" {
 		home := os.Getenv("HOMEDRIVE") + os.Getenv("HOMEPATH")

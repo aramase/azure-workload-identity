@@ -22,7 +22,7 @@ type jwksCmd struct {
 	outputFile string
 }
 
-// NewJWKSCmd returns a new serviceaccount command
+// NewJWKSCmd returns a new serviceaccount command.
 func NewJWKSCmd() *cobra.Command {
 	jwksCmd := &jwksCmd{}
 

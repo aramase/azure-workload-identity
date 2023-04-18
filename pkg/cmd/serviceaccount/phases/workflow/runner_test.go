@@ -77,8 +77,8 @@ func TestIsPhaseActive(t *testing.T) {
 			r := &runner{
 				skipPhases: test.skipPhases,
 			}
-			if r.IsPhaseActive(Phase{Name: test.phase}) != test.expect {
-				t.Errorf("expected IsPhaseActive to return %v, got %v", test.expect, r.IsPhaseActive(Phase{Name: test.phase}))
+			if r.IsPhaseActive(&Phase{Name: test.phase}) != test.expect {
+				t.Errorf("expected IsPhaseActive to return %v, got %v", test.expect, r.IsPhaseActive(&Phase{Name: test.phase}))
 			}
 		})
 	}

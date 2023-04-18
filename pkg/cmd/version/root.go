@@ -8,7 +8,7 @@ import (
 	"github.com/Azure/azure-workload-identity/pkg/version"
 )
 
-// NewVersionCmd returns a new version command
+// NewVersionCmd returns a new version command.
 func NewVersionCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "version",

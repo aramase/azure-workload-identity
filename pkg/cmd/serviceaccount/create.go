@@ -59,7 +59,7 @@ func newCreateCmd(authProvider auth.Provider) *cobra.Command {
 }
 
 // createData is an implementation of phases.CreateData in
-// pkg/cmd/serviceaccount/phases/create/data.go
+// pkg/cmd/serviceaccount/phases/create/data.go.
 type createData struct {
 	serviceAccountName            string
 	serviceAccountNamespace       string

@@ -25,7 +25,7 @@ func (a azureIdentityBindings) Less(i, j int) bool {
 	return a[i].Namespace < a[j].Namespace
 }
 
-// ListAzureIdentityBinding returns a list of AzureIdentityBinding
+// ListAzureIdentityBinding returns a list of AzureIdentityBinding.
 func ListAzureIdentityBinding(ctx context.Context, kubeClient client.Client, namespace string) ([]aadpodv1.AzureIdentityBinding, error) {
 	list := &aadpodv1.AzureIdentityBindingList{}
 	if err := kubeClient.List(ctx, list, client.InNamespace(namespace)); err != nil {
