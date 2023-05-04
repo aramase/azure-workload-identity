@@ -129,18 +129,33 @@ func (c *AzureClient) DeleteApplication(ctx context.Context, objectID string) er
 func (c *AzureClient) AddFederatedCredential(ctx context.Context, objectID string, fic models.FederatedIdentityCredentialable) error {
 	mlog.Debug("Adding federated credential", "objectID", objectID)
 
-	fic, err := c.graphServiceClient.ApplicationsById(objectID).FederatedIdentityCredentials().Post(ctx, fic, nil)
-	if err != nil {
-		return err
-	}
-	graphErr, err := GetGraphError(fic.GetAdditionalData())
-	if err != nil {
-		return err
-	}
-	if graphErr != nil {
-		return *graphErr
-	}
-	return nil
+	_, err := c.graphServiceClient.ApplicationsById(objectID).FederatedIdentityCredentials().Post(ctx, fic, nil)
+	// switch v := err.(type) {
+	// case *odataerrors.ODataError:
+	// 	errorable := v.GetError()
+
+	// 	fmt.Printf("error: %s | %s\n",
+	// 		*errorable.GetCode(),
+	// 		*errorable.GetMessage(),
+	// 	)
+	// 	details := errorable.GetDetails()
+	// 	for idx, v := range details {
+	// 		fmt.Printf("  %d - %s %s\n",
+	// 			idx,
+	// 			*v.GetMessage(),
+	// 			*v.GetCode(),
+	// 		)
+	// 	}
+	// 	extras := v.GetAdditionalData()
+	// 	for k, v := range extras {
+	// 		fmt.Printf("k: %s: %T %+v\n", k, v, v)
+	// 	}
+
+	// default:
+	// 	fmt.Printf("err: %s", err)
+	// }
+
+	return err
 }
 
 // GetFederatedCredential gets a federated credential from the cloud provider.
