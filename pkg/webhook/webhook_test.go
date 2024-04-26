@@ -10,15 +10,16 @@ import (
 	"strings"
 	"testing"
 
+	"monis.app/mlog"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	atypes "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+
 	admissionv1 "k8s.io/api/admission/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/pointer"
-	"monis.app/mlog"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	atypes "sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	"github.com/Azure/azure-workload-identity/pkg/config"
 )
@@ -728,39 +729,44 @@ func TestHandle(t *testing.T) {
 	decoder, _ := atypes.NewDecoder(runtime.NewScheme())
 
 	tests := []struct {
-		name               string
-		serviceAccountName string
-		podLabels          map[string]string
-		clientObjects      []client.Object
-		readerObjects      []client.Object
+		name          string
+		rawPod        []byte
+		clientObjects []client.Object
+		readerObjects []client.Object
 	}{
 		{
-			name:               "service account in cache",
-			serviceAccountName: "sa",
-			clientObjects:      serviceAccounts,
-			readerObjects:      nil,
+			name:          "service account in cache",
+			rawPod:        newPodRaw("pod", "ns1", "sa", nil, nil, false),
+			clientObjects: serviceAccounts,
+			readerObjects: nil,
 		},
 		{
-			name:               "service account not in cache",
-			serviceAccountName: "sa",
-			clientObjects:      nil,
-			readerObjects:      serviceAccounts,
+			name:          "service account not in cache",
+			rawPod:        newPodRaw("pod", "ns1", "sa", nil, nil, false),
+			clientObjects: nil,
+			readerObjects: serviceAccounts,
 		},
 		{
 			name:          "default service account in cache",
+			rawPod:        newPodRaw("pod", "ns1", "", nil, nil, false),
 			clientObjects: serviceAccounts,
 			readerObjects: nil,
 		},
 		{
 			name:          "default service account not in cache",
+			rawPod:        newPodRaw("pod", "ns1", "", nil, nil, false),
 			clientObjects: nil,
 			readerObjects: serviceAccounts,
 		},
 		{
-			name: "pod has the required label, no warnings",
-			podLabels: map[string]string{
-				UseWorkloadIdentityLabel: "true",
-			},
+			name:          "pod has the required label, no warnings",
+			rawPod:        newPodRaw("pod", "ns1", "sa", map[string]string{UseWorkloadIdentityLabel: "true"}, nil, false),
+			clientObjects: serviceAccounts,
+			readerObjects: nil,
+		},
+		{
+			name:          "pod has the required label, restart policy in init container",
+			rawPod:        []byte(`{"metadata":{"name":"pod","namespace":"ns1","creationTimestamp":null,"labels":{"azure.workload.identity/use":"true"}},"spec":{"initContainers":[{"name":"init-container","image":"init-container-image","restartPolicy":"Always"}],"containers":[{"name":"container","image":"image","resources":{}}]}}`),
 			clientObjects: serviceAccounts,
 			readerObjects: nil,
 		},
@@ -786,7 +792,7 @@ func TestHandle(t *testing.T) {
 						Version: "v1",
 						Kind:    "Pod",
 					},
-					Object:    runtime.RawExtension{Raw: newPodRaw("pod", "ns1", test.serviceAccountName, test.podLabels, nil, false)},
+					Object:    runtime.RawExtension{Raw: test.rawPod},
 					Namespace: "ns1",
 					Operation: admissionv1.Create,
 				},
@@ -795,6 +801,11 @@ func TestHandle(t *testing.T) {
 			resp := m.Handle(context.Background(), req)
 			if !resp.Allowed {
 				t.Fatalf("expected to be allowed")
+			}
+			for _, patch := range resp.Patches {
+				if patch.Operation == "remove" {
+					t.Errorf("expected no remove patches, got: %v", patch)
+				}
 			}
 		})
 	}
