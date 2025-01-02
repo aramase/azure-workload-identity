@@ -75,4 +75,6 @@ curl -s "https://${AZURE_STORAGE_ACCOUNT}.blob.core.windows.net/${AZURE_STORAGE_
 }
 ```
 
+</details>
+
 [1]: https://openid.net/specs/openid-connect-discovery-1_0.html#ProviderConfig
